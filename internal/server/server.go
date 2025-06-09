@@ -11,6 +11,8 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 
 	"game_tcpserver/internal/database"
+	"game_tcpserver/internal/service"
+	"game_tcpserver/internal/tcp"
 )
 
 type Server struct {
@@ -23,7 +25,7 @@ func NewServer() *http.Server {
 	portStr := os.Getenv("PORT")
 	port, err := strconv.Atoi(portStr)
 	if err != nil {
-		port = 8080
+		port = 5001
 	}
 
 	db, err := database.New()
@@ -32,8 +34,13 @@ func NewServer() *http.Server {
 		os.Exit(1)
 	}
 
-	// ws := websocket.NewWebSocketServer(conversationService, messageService)
-	// go ws.Run()
+	// Initialize your services
+	conversationService := service.NewConversationService(db)
+
+	// Start TCP server
+	go tcp.StartTCPServer(tcp.Dependencies{
+		ConversationService: conversationService,
+	})
 
 	newServer := &Server{
 		port: port,

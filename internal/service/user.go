@@ -43,7 +43,7 @@ func (s *UserService) Create(user model.User) (*model.User, error) {
 		return nil, err
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
 	defer cancel()
 
 	// Check if user email or username already exists

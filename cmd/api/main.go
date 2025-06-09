@@ -10,13 +10,11 @@ import (
 	"time"
 
 	"game_tcpserver/internal/server"
-	"game_tcpserver/internal/tcp"
 )
 
 func gracefulShutdown(apiServer *http.Server, done chan bool) {
 	// Create context that listens for the interrupt signal from the OS.
 
-	go tcp.StartTCPServer()
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 

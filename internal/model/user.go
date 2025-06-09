@@ -1,8 +1,9 @@
 package model
 
 import (
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"time"
+
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type User struct {
@@ -17,3 +18,5 @@ type User struct {
 	CreatedAt     time.Time          `bson:"createdAt" json:"createdAt"`
 	UpdatedAt     time.Time          `bson:"updatedAt" json:"updatedAt"`
 }
+
+///"chat", "move", "file"
