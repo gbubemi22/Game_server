@@ -9,11 +9,15 @@ import (
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
 
+	"game_tcpserver/internal/game"
+	"game_tcpserver/internal/model"
 	"game_tcpserver/internal/service"
 )
 
 type Dependencies struct {
 	ConversationService *service.ConversationService
+	MessageService      *service.MessageService
+	Conn                net.Conn // Add net.Conn to Dependencies
 }
 
 func HandleConnection(conn net.Conn, deps Dependencies) {
@@ -31,7 +35,12 @@ func HandleConnection(conn net.Conn, deps Dependencies) {
 		fmt.Printf("[%v] %s\n", conn.RemoteAddr(), msg)
 
 		// Route message to appropriate handler
-		response := handleCommand(msg, deps)
+		// Pass the connection to the dependencies for use in game-related functions
+		deps.Conn = conn
+		response := handleCommand(msg, deps) // Assuming handleCommand doesn't need conn directly
+		response = handleSendMessage(msg, deps)
+		response = handleRoom(msg, deps)
+
 
 		conn.Write([]byte(response + "\n"))
 	}
@@ -106,4 +115,84 @@ func handleCommand(msg string, deps Dependencies) string {
 	default:
 		return "Unknown command"
 	}
+}
+
+type TCPMessage struct {
+	Type           string `json:"type"`
+	SenderID       string `json:"senderId,omitempty"`
+	ConversationID string `json:"conversationId,omitempty"`
+	Content        string `json:"content,omitempty"`
+}
+
+func handleSendMessage(msg string, deps Dependencies) string {
+	var cmd TCPMessage
+	if err := json.Unmarshal([]byte(msg), &cmd); err != nil {
+		return "Invalid JSON format"
+	}
+
+	switch cmd.Type {
+	case "send_message":
+		if cmd.SenderID == "" || cmd.ConversationID == "" || cmd.Content == "" {
+			return "Missing senderId, conversationId, or content"
+		}
+
+		senderID, err1 := primitive.ObjectIDFromHex(cmd.SenderID)
+		convID, err2 := primitive.ObjectIDFromHex(cmd.ConversationID)
+		if err1 != nil || err2 != nil {
+			return "Invalid ObjectID(s)"
+		}
+
+		message := model.Message{
+			SenderID:       senderID,
+			ConversationID: convID,
+			Content:        cmd.Content,
+		}
+
+		saved, err := deps.MessageService.CreateMessage(message)
+		if err != nil {
+			return "Error saving message: " + err.Error()
+		}
+
+		return "Message saved with ID: " + saved.ID.Hex()
+
+	default:
+		return "Unknown command"
+	}
+}
+
+type TCPRoom struct {
+	Type       string `json:"type"`
+	RoomID     string `json:"roomId,omitempty"`
+	PlayerID   string `json:"playerId,omitempty"`
+	PlayerName string `json:"playerName,omitempty"`
+}
+
+func handleRoom(msg string, deps Dependencies) string {
+	var cmd TCPRoom
+	if err := json.Unmarshal([]byte(msg), &cmd); err != nil {
+		return "Invalid JSON format"
+	}
+
+	switch cmd.Type {
+	case "create_room":
+
+		if cmd.RoomID == "" || cmd.PlayerID == "" || cmd.PlayerName == "" {
+			return "Missing roomId, playerId, or playerName"
+		}
+
+		player := &game.Player{
+			ID:     cmd.PlayerID,
+			Name:   cmd.PlayerName,
+			Health: 100,
+			Conn:   deps.Conn, // <-- you must pass conn in your Dependencies
+		}
+
+		game.AddPlayerToRoom(cmd.RoomID, player)
+
+		return "Room created and player joined: " + cmd.RoomID
+
+	default:
+		return "Unknown command"
+	}
+
 }
